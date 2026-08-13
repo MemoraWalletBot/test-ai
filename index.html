@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Crypto Guardian AI</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #161921;
+    --card: #1e2230;
+    --border: #2a2f42;
+    --accent: #6c63ff;
+    --accent2: #00d4aa;
+    --danger: #ff4757;
+    --warn: #ffa502;
+    --text: #e8eaf0;
+    --muted: #7b82a0;
+    --green: #2ed573;
+    --radius: 14px;
+    --font: -apple-system, 'SF Pro Display', 'Segoe UI', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .header-title { font-size: 16px; font-weight: 600; }
+  .header-sub { font-size: 11px; color: var(--muted); }
+  .status-dot {
+    width: 8px; height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    margin-left: auto;
+    box-shadow: 0 0 6px var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 8px;
+  }
+  .tab {
+    flex: 1;
+    padding: 10px 4px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all .2s;
+    user-select: none;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-icon { font-size: 18px; display: block; margin-bottom: 2px; }
+
+  /* ── PAGES ── */
+  .page { display: none; flex-direction: column; height: calc(100vh - 116px); }
+  .page.active { display: flex; }
+
+  /* ── CHAT PAGE ── */
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    scroll-behavior: smooth;
+  }
+  .msg {
+    max-width: 88%;
+    padding: 10px 13px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    line-height: 1.5;
+    word-break: break-word;
+  }
+  .msg.user {
+    align-self: flex-end;
+    background: var(--accent);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+  .msg.ai {
+    align-self: flex-start;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+  }
+  .msg.ai .msg-label {
+    font-size: 10px;
+    color: var(--accent2);
+    font-weight: 600;
+    letter-spacing: .5px;
+    margin-bottom: 4px;
+    display: block;
+  }
+  .msg.typing { opacity: .7; }
+  .dots { display: inline-flex; gap: 4px; }
+  .dots span {
+    width: 6px; height: 6px;
+    background: var(--muted);
+    border-radius: 50%;
+    animation: bounce .9s infinite;
+  }
+  .dots span:nth-child(2) { animation-delay: .15s; }
+  .dots span:nth-child(3) { animation-delay: .3s; }
+  @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
+
+  .quick-btns {
+    padding: 8px 14px;
+    display: flex;
+    gap: 7px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .quick-btn {
+    flex-shrink: 0;
+    padding: 7px 13px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 12px;
+    color: var(--text);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .15s;
+  }
+  .quick-btn:active { background: var(--border); }
+
+  .chat-input-row {
+    padding: 10px 14px;
+    display: flex;
+    gap: 8px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+  .chat-input {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 10px 16px;
+    font-size: 14px;
+    color: var(--text);
+    outline: none;
+    font-family: var(--font);
+    resize: none;
+    max-height: 120px;
+    line-height: 1.4;
+  }
+  .chat-input::placeholder { color: var(--muted); }
+  .send-btn {
+    width: 42px; height: 42px;
+    background: var(--accent);
+    border: none;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: transform .1s;
+  }
+  .send-btn:active { transform: scale(.92); }
+  .send-btn svg { width: 18px; height: 18px; fill: white; }
+
+  /* ── SCAN PAGE ── */
+  .scan-page { overflow-y: auto; padding: 14px; gap: 12px; }
+  .scan-input-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+  }
+  .scan-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .scan-input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--text);
+    outline: none;
+    font-family: var(--font);
+  }
+  .scan-input::placeholder { color: var(--muted); }
+  .scan-btn {
+    width: 100%;
+    margin-top: 10px;
+    padding: 12px;
+    background: var(--accent);
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: white;
+    cursor: pointer;
+    transition: opacity .15s;
+  }
+  .scan-btn:active { opacity: .8; }
+
+  .result-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .result-header {
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .risk-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-left: auto;
+    letter-spacing: .5px;
+  }
+  .risk-low { background: rgba(46,213,115,.15); color: var(--green); }
+  .risk-mid { background: rgba(255,165,2,.15); color: var(--warn); }
+  .risk-high { background: rgba(255,71,87,.15); color: var(--danger); }
+
+  .result-scores {
+    padding: 12px 14px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .score-item { }
+  .score-name { font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+  .score-bar-bg {
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .score-bar { height: 100%; border-radius: 3px; transition: width .6s ease; }
+  .score-val { font-size: 12px; font-weight: 600; margin-top: 3px; }
+  .result-analysis { padding: 0 14px 14px; font-size: 13px; line-height: 1.6; color: var(--muted); }
+
+  .scan-presets {
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .preset-coin {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: border-color .15s;
+  }
+  .preset-coin:active { border-color: var(--accent); }
+  .preset-icon { font-size: 22px; }
+  .preset-name { font-size: 13px; font-weight: 600; }
+  .preset-sub { font-size: 11px; color: var(--muted); }
+  .preset-arrow { margin-left: auto; color: var(--muted); font-size: 16px; }
+
+  /* ── MARKET PAGE ── */
+  .market-page { overflow-y: auto; padding: 14px; gap: 10px; }
+  .market-header-row {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;
+  }
+  .section-title { font-size: 14px; font-weight: 600; }
+  .refresh-btn {
+    font-size: 11px; color: var(--accent);
+    background: none; border: none;
+    cursor: pointer; padding: 4px 8px;
+  }
+  .coin-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .coin-logo { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: var(--border); }
+  .coin-logo-placeholder {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .coin-name { font-size: 14px; font-weight: 600; }
+  .coin-symbol { font-size: 11px; color: var(--muted); }
+  .coin-price { margin-left: auto; text-align: right; }
+  .coin-price-val { font-size: 14px; font-weight: 600; }
+  .coin-change { font-size: 12px; font-weight: 500; }
+  .up { color: var(--green); }
+  .down { color: var(--danger); }
+
+  .skeleton {
+    background: var(--border);
+    border-radius: 6px;
+    animation: shimmer 1.4s infinite;
+  }
+  @keyframes shimmer { 0%,100%{opacity:.5} 50%{opacity:1} }
+
+  /* ── WALLETS PAGE ── */
+  .wallets-page { overflow-y: auto; padding: 14px; gap: 12px; }
+  .wallet-input-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+  }
+  .wallet-input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--text);
+    outline: none;
+    font-family: monospace;
+    word-break: break-all;
+  }
+  .wallet-input::placeholder { color: var(--muted); font-family: var(--font); font-size: 13px; }
+  .track-btn {
+    width: 100%;
+    margin-top: 10px;
+    padding: 12px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: white;
+    cursor: pointer;
+  }
+  .wallet-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .wallet-card-header {
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .wallet-addr { font-size: 12px; font-family: monospace; color: var(--muted); }
+  .wallet-remove { margin-left: auto; font-size: 18px; color: var(--danger); cursor: pointer; background: none; border: none; }
+  .wallet-activity { padding: 10px 14px; }
+  .activity-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .activity-row:last-child { border-bottom: none; }
+  .activity-type {
+    padding: 3px 7px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .buy-tag { background: rgba(46,213,115,.15); color: var(--green); }
+  .sell-tag { background: rgba(255,71,87,.15); color: var(--danger); }
+  .activity-coin { font-weight: 600; }
+  .activity-amount { margin-left: auto; color: var(--muted); }
+  .empty-state {
+    text-align: center;
+    padding: 30px 20px;
+    color: var(--muted);
+  }
+  .empty-icon { font-size: 36px; margin-bottom: 10px; }
+  .empty-text { font-size: 13px; line-height: 1.5; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 0; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">🛡️</div>
+  <div>
+    <div class="header-title">Crypto Guardian AI</div>
+    <div class="header-sub">ИИ-страж криптовалют</div>
+  </div>
+  <div class="status-dot"></div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('chat')">
+    <span class="tab-icon">💬</span>ИИ Чат
+  </div>
+  <div class="tab" onclick="switchTab('scan')">
+    <span class="tab-icon">🔍</span>Скан
+  </div>
+  <div class="tab" onclick="switchTab('market')">
+    <span class="tab-icon">📈</span>Рынок
+  </div>
+  <div class="tab" onclick="switchTab('wallets')">
+    <span class="tab-icon">👁️</span>Кошельки
+  </div>
+</div>
+
+<!-- ── CHAT PAGE ── -->
+<div id="page-chat" class="page active" style="flex-direction:column;">
+  <div class="chat-messages" id="chatMessages">
+    <div class="msg ai">
+      <span class="msg-label">CRYPTO GUARDIAN AI</span>
+      Привет! Я ваш ИИ-страж криптовалют 🛡️<br><br>
+      Могу помочь с:<br>
+      • Анализом любого коина или мем-токена<br>
+      • Детектором скама и rug pull<br>
+      • Вопросами о токеномике и рисках<br>
+      • Трекингом умных кошельков<br><br>
+      Спрашивайте на любом языке!
+    </div>
+  </div>
+
+  <div class="quick-btns" id="quickBtns">
+    <button class="quick-btn" onclick="quickAsk('Что такое мем-коин и как не попасть на скам?')">🧠 Что такое мем-коин?</button>
+    <button class="quick-btn" onclick="quickAsk('Как определить rug pull проект?')">⚠️ Как найти rug pull?</button>
+    <button class="quick-btn" onclick="quickAsk('Объясни токеномику простыми словами')">📊 Токеномика</button>
+    <button class="quick-btn" onclick="quickAsk('Что такое смарт-мани в крипто?')">💰 Смарт-мани</button>
+    <button class="quick-btn" onclick="quickAsk('Как безопасно покупать мем-коины на Solana?')">🚀 Solana мем-коины</button>
+  </div>
+
+  <div class="chat-input-row">
+    <textarea class="chat-input" id="chatInput" placeholder="Спросите о любом коине..." rows="1"
+      oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
+    <button class="send-btn" onclick="sendMessage()">
+      <svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ── SCAN PAGE ── -->
+<div id="page-scan" class="page" style="flex-direction:column;">
+  <div class="scan-page" style="display:flex;flex-direction:column;overflow-y:auto;padding:14px;gap:12px;">
+    <div class="scan-input-card">
+      <div class="scan-label">🔍 Введите название коина или адрес контракта</div>
+      <input class="scan-input" id="scanInput" placeholder="Напр: BONK, PEPE, или адрес контракта...">
+      <button class="scan-btn" onclick="scanCoin()">🛡️ Проверить на скам</button>
+    </div>
+
+    <div id="scanResult" style="display:none;"></div>
+
+    <div class="section-title" style="margin-top:4px;">Быстрая проверка популярных</div>
+    <div class="scan-presets">
+      <div class="preset-coin" onclick="scanPreset('BONK')">
+        <div class="preset-icon">🐕</div>
+        <div>
+          <div class="preset-name">BONK</div>
+          <div class="preset-sub">Solana мем-коин</div>
+        </div>
+        <div class="preset-arrow">›</div>
+      </div>
+      <div class="preset-coin" onclick="scanPreset('PEPE')">
+        <div class="preset-icon">🐸</div>
+        <div>
+          <div class="preset-name">PEPE</div>
+          <div class="preset-sub">Ethereum мем-токен</div>
+        </div>
+        <div class="preset-arrow">›</div>
+      </div>
+      <div class="preset-coin" onclick="scanPreset('WIF')">
+        <div class="preset-icon">🐶</div>
+        <div>
+          <div class="preset-name">WIF (dogwifhat)</div>
+          <div class="preset-sub">Solana мем-коин</div>
+        </div>
+        <div class="preset-arrow">›</div>
+      </div>
+      <div class="preset-coin" onclick="scanPreset('DOGE')">
+        <div class="preset-icon">🚀</div>
+        <div>
+          <div class="preset-name">DOGE</div>
+          <div class="preset-sub">Оригинальный мем-коин</div>
+        </div>
+        <div class="preset-arrow">›</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MARKET PAGE ── -->
+<div id="page-market" class="page" style="flex-direction:column;">
+  <div class="market-page" style="display:flex;flex-direction:column;overflow-y:auto;padding:14px;gap:10px;">
+    <div class="market-header-row">
+      <div class="section-title">🔥 Топ мем-коины</div>
+      <button class="refresh-btn" onclick="loadMarket()">↻ Обновить</button>
+    </div>
+    <div id="memcoinList">
+      <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Загружаем данные...</div>
+    </div>
+
+    <div class="market-header-row" style="margin-top:8px;">
+      <div class="section-title">💎 Топ крипто</div>
+    </div>
+    <div id="topCoinList">
+      <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Загружаем данные...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── WALLETS PAGE ── -->
+<div id="page-wallets" class="page" style="flex-direction:column;">
+  <div class="wallets-page" style="display:flex;flex-direction:column;overflow-y:auto;padding:14px;gap:12px;">
+    <div class="wallet-input-card">
+      <div class="scan-label">👁️ Добавить Solana кошелёк для слежки</div>
+      <input class="wallet-input" id="walletInput" placeholder="Вставьте адрес Solana кошелька...">
+      <button class="track-btn" onclick="addWallet()">+ Отслеживать кошелёк</button>
+    </div>
+    <div id="walletList"></div>
+  </div>
+</div>
+
+<script>
+// ── TELEGRAM INIT ──
+const tg = window.Telegram?.WebApp;
+if (tg) {
+  tg.expand();
+  tg.setBackgroundColor('#0d0f14');
+  tg.setHeaderColor('#161921');
+  tg.ready();
+}
+
+// ── TAB SWITCH ──
+function switchTab(tab) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + tab).classList.add('active');
+  const tabs = ['chat','scan','market','wallets'];
+  document.querySelectorAll('.tab')[tabs.indexOf(tab)].classList.add('active');
+  if (tab === 'market' && !marketLoaded) loadMarket();
+}
+
+// ── CHAT ──
+let chatHistory = [];
+const systemPrompt = `You are Crypto Guardian AI — an expert crypto and meme-coin intelligence assistant integrated into a Telegram Mini App. 
+
+Your capabilities:
+- Answer ANY question about cryptocurrencies, meme coins, DeFi, NFTs, wallets
+- Detect scam patterns, rug pulls, honeypots
+- Explain tokenomics, smart money movements, on-chain data
+- Analyze risk profiles of coins
+- Track and explain whale wallet behavior
+
+Response rules:
+- Always respond in the SAME language the user writes in (Russian, English, Ukrainian, etc.)
+- Be concise but thorough — Telegram users want quick, actionable insights
+- Use emojis sparingly to highlight key points
+- For risk warnings, be clear and direct
+- Format with line breaks for readability
+- Never give financial advice — provide analysis and education only
+- When discussing meme coins, always mention risks clearly`;
+
+async function sendMessage() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  appendMsg(text, 'user');
+  chatHistory.push({ role: 'user', content: text });
+
+  const typingId = appendTyping();
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: chatHistory.slice(-10)
+      })
+    });
+    const data = await res.json();
+    const reply = data.content?.[0]?.text || 'Ошибка получения ответа.';
+    removeTyping(typingId);
+    appendMsg(reply, 'ai');
+    chatHistory.push({ role: 'assistant', content: reply });
+  } catch(e) {
+    removeTyping(typingId);
+    appendMsg('Ошибка соединения. Проверьте интернет и попробуйте снова.', 'ai');
+  }
+}
+
+function appendMsg(text, role) {
+  const msgs = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  if (role === 'ai') {
+    div.innerHTML = `<span class="msg-label">CRYPTO GUARDIAN AI</span>${escapeHtml(text).replace(/\n/g,'<br>')}`;
+  } else {
+    div.textContent = text;
+  }
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+function appendTyping() {
+  const msgs = document.getElementById('chatMessages');
+  const id = 'typing-' + Date.now();
+  const div = document.createElement('div');
+  div.className = 'msg ai typing';
+  div.id = id;
+  div.innerHTML = `<span class="msg-label">CRYPTO GUARDIAN AI</span><div class="dots"><span></span><span></span><span></span></div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return id;
+}
+
+function removeTyping(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+function escapeHtml(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function quickAsk(q) {
+  document.getElementById('chatInput').value = q;
+  sendMessage();
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+// ── SCAN / SCAM DETECTOR ──
+async function scanCoin() {
+  const input = document.getElementById('scanInput').value.trim();
+  if (!input) { alert('Введите название коина!'); return; }
+  await performScan(input);
+}
+
+async function scanPreset(name) {
+  document.getElementById('scanInput').value = name;
+  await performScan(name);
+  switchTab('scan');
+}
+
+async function performScan(coinName) {
+  const resultDiv = document.getElementById('scanResult');
+  resultDiv.style.display = 'block';
+  resultDiv.innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">
+    🔍 Анализируем ${coinName}...</div>`;
+
+  const scanPrompt = `Analyze this cryptocurrency/meme coin for scam risk: "${coinName}"
+
+Respond ONLY in valid JSON format (no markdown, no extra text):
+{
+  "name": "full coin name",
+  "symbol": "TICKER",
+  "riskLevel": "LOW" or "MEDIUM" or "HIGH",
+  "riskScore": number 0-100,
+  "liquidityScore": number 0-100,
+  "communityScore": number 0-100,
+  "decentralizationScore": number 0-100,
+  "redFlags": ["flag1", "flag2"],
+  "greenFlags": ["flag1", "flag2"],
+  "summary": "2-3 sentence analysis in Russian",
+  "verdict": "one sentence verdict in Russian"
+}`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: scanPrompt }]
+      })
+    });
+    const data = await res.json();
+    let raw = data.content?.[0]?.text || '{}';
+    raw = raw.replace(/```json|```/g,'').trim();
+    const analysis = JSON.parse(raw);
+    renderScanResult(analysis);
+  } catch(e) {
+    resultDiv.innerHTML = `<div style="padding:16px;color:var(--danger);font-size:13px;">⚠️ Ошибка анализа. Попробуйте ещё раз.</div>`;
+  }
+}
+
+function renderScanResult(a) {
+  const riskClass = a.riskLevel === 'LOW' ? 'risk-low' : a.riskLevel === 'MEDIUM' ? 'risk-mid' : 'risk-high';
+  const riskEmoji = a.riskLevel === 'LOW' ? '✅' : a.riskLevel === 'MEDIUM' ? '⚠️' : '🚨';
+  const riskLabel = a.riskLevel === 'LOW' ? 'НИЗКИЙ РИСК' : a.riskLevel === 'MEDIUM' ? 'СРЕДНИЙ РИСК' : 'ВЫСОКИЙ РИСК';
+
+  const scores = [
+    { name: 'Безопасность', val: 100 - (a.riskScore||50), color: scoreColor(100-(a.riskScore||50)) },
+    { name: 'Ликвидность', val: a.liquidityScore||50, color: scoreColor(a.liquidityScore||50) },
+    { name: 'Сообщество', val: a.communityScore||50, color: scoreColor(a.communityScore||50) },
+    { name: 'Децентр.', val: a.decentralizationScore||50, color: scoreColor(a.decentralizationScore||50) },
+  ];
+
+  const redFlags = (a.redFlags||[]).map(f=>`<div style="color:var(--danger);font-size:12px;padding:3px 0;">🔴 ${f}</div>`).join('');
+  const greenFlags = (a.greenFlags||[]).map(f=>`<div style="color:var(--green);font-size:12px;padding:3px 0;">🟢 ${f}</div>`).join('');
+
+  document.getElementById('scanResult').innerHTML = `
+    <div class="result-card">
+      <div class="result-header">
+        <div>
+          <div style="font-size:15px;font-weight:700;">${a.name||coinName}</div>
+          <div style="font-size:12px;color:var(--muted);">${a.symbol||''}</div>
+        </div>
+        <div class="risk-badge ${riskClass}">${riskEmoji} ${riskLabel}</div>
+      </div>
+      <div class="result-scores">
+        ${scores.map(s=>`
+          <div class="score-item">
+            <div class="score-name">${s.name}</div>
+            <div class="score-bar-bg"><div class="score-bar" style="width:${s.val}%;background:${s.color};"></div></div>
+            <div class="score-val" style="color:${s.color}">${s.val}/100</div>
+          </div>
+        `).join('')}
+      </div>
+      ${redFlags||greenFlags ? `
+      <div style="padding:0 14px 10px;">
+        ${redFlags}${greenFlags}
+      </div>` : ''}
+      <div class="result-analysis">
+        <div style="color:var(--text);margin-bottom:6px;">${a.summary||''}</div>
+        <div style="font-weight:600;color:var(--accent2);">Вердикт: ${a.verdict||''}</div>
+      </div>
+    </div>`;
+}
+
+function scoreColor(v) {
+  if (v >= 70) return 'var(--green)';
+  if (v >= 40) return 'var(--warn)';
+  return 'var(--danger)';
+}
+
+// ── MARKET DATA (CoinGecko free API) ──
+let marketLoaded = false;
+
+async function loadMarket() {
+  marketLoaded = true;
+  document.getElementById('memcoinList').innerHTML = skeletonList(5);
+  document.getElementById('topCoinList').innerHTML = skeletonList(5);
+
+  try {
+    // Meme coins
+    const memeIds = 'bonk,pepe,dogecoin,shiba-inu,floki,dogwifcoin,popcat,mog-coin';
+    const memeRes = await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${memeIds}&order=market_cap_desc&per_page=8&sparkline=false`);
+    const memeData = await memeRes.json();
+    renderCoinList('memcoinList', memeData);
+
+    // Top crypto
+    const topRes = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=6&page=1&sparkline=false');
+    const topData = await topRes.json();
+    renderCoinList('topCoinList', topData);
+  } catch(e) {
+    document.getElementById('memcoinList').innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">
+      ⚠️ CoinGecko недоступен. Попробуйте позже.<br><br>
+      <button onclick="loadMarket()" style="background:var(--accent);border:none;color:white;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:12px;">Повторить</button>
+    </div>`;
+    document.getElementById('topCoinList').innerHTML = '';
+  }
+}
+
+function renderCoinList(containerId, coins) {
+  if (!Array.isArray(coins) || coins.length === 0) {
+    document.getElementById(containerId).innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Нет данных</div>`;
+    return;
+  }
+  document.getElementById(containerId).innerHTML = coins.map(c => {
+    const change = c.price_change_percentage_24h || 0;
+    const isUp = change >= 0;
+    const price = formatPrice(c.current_price);
+    return `
+      <div class="coin-card" onclick="askAboutCoin('${c.name}', '${c.symbol?.toUpperCase()}', '${price}', '${change.toFixed(2)}')">
+        ${c.image ? `<img class="coin-logo" src="${c.image}" alt="${c.symbol}" loading="lazy">` 
+          : `<div class="coin-logo-placeholder">${c.symbol?.[0]?.toUpperCase()||'?'}</div>`}
+        <div>
+          <div class="coin-name">${c.name}</div>
+          <div class="coin-symbol">${c.symbol?.toUpperCase()}</div>
+        </div>
+        <div class="coin-price">
+          <div class="coin-price-val">$${price}</div>
+          <div class="coin-change ${isUp?'up':'down'}">${isUp?'+':''}${change.toFixed(2)}%</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function formatPrice(p) {
+  if (!p) return '0';
+  if (p >= 1000) return p.toLocaleString('en', {maximumFractionDigits:0});
+  if (p >= 1) return p.toFixed(2);
+  if (p >= 0.01) return p.toFixed(4);
+  return p.toFixed(8);
+}
+
+function askAboutCoin(name, symbol, price, change) {
+  switchTab('chat');
+  const q = `Расскажи про ${name} (${symbol}). Текущая цена: $${price}, изменение за 24ч: ${change}%. Какие риски, перспективы?`;
+  document.getElementById('chatInput').value = q;
+  sendMessage();
+}
+
+function skeletonList(n) {
+  return Array(n).fill(0).map(()=>`
+    <div class="coin-card">
+      <div class="skeleton" style="width:36px;height:36px;border-radius:50%;"></div>
+      <div>
+        <div class="skeleton" style="width:80px;height:13px;margin-bottom:5px;"></div>
+        <div class="skeleton" style="width:50px;height:10px;"></div>
+      </div>
+      <div style="margin-left:auto;text-align:right;">
+        <div class="skeleton" style="width:60px;height:13px;margin-bottom:5px;"></div>
+        <div class="skeleton" style="width:40px;height:10px;margin-left:auto;"></div>
+      </div>
+    </div>`).join('');
+}
+
+// ── WALLETS ──
+let trackedWallets = JSON.parse(localStorage.getItem('wallets') || '[]');
+
+function renderWallets() {
+  const container = document.getElementById('walletList');
+  if (trackedWallets.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">👁️</div>
+        <div class="empty-text">Добавьте Solana кошелёк умных денег для отслеживания их активности</div>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = trackedWallets.map((w, i) => {
+    const short = w.address.slice(0,6) + '...' + w.address.slice(-4);
+    const activity = generateMockActivity();
+    return `
+      <div class="wallet-card">
+        <div class="wallet-card-header">
+          <div>
+            <div style="font-size:13px;font-weight:600;">${w.label||'Smart Wallet #'+(i+1)}</div>
+            <div class="wallet-addr">${short}</div>
+          </div>
+          <button class="wallet-remove" onclick="removeWallet(${i})">✕</button>
+        </div>
+        <div class="wallet-activity">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Последние транзакции</div>
+          ${activity}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function generateMockActivity() {
+  const coins = ['BONK','WIF','PEPE','POPCAT','DOGE','SOL','JUP'];
+  const rows = [];
+  for (let i = 0; i < 3; i++) {
+    const isBuy = Math.random() > 0.4;
+    const coin = coins[Math.floor(Math.random()*coins.length)];
+    const amount = (Math.random()*50000+1000).toFixed(0);
+    const time = Math.floor(Math.random()*23+1)+'ч назад';
+    rows.push(`
+      <div class="activity-row">
+        <span class="activity-type ${isBuy?'buy-tag':'sell-tag'}">${isBuy?'BUY':'SELL'}</span>
+        <span class="activity-coin">${coin}</span>
+        <span style="font-size:11px;color:var(--muted);">${time}</span>
+        <span class="activity-amount">${Number(amount).toLocaleString()}</span>
+      </div>`);
+  }
+  return rows.join('');
+}
+
+function addWallet() {
+  const input = document.getElementById('walletInput');
+  const addr = input.value.trim();
+  if (!addr || addr.length < 20) {
+    alert('Введите корректный адрес кошелька!');
+    return;
+  }
+  if (trackedWallets.find(w => w.address === addr)) {
+    alert('Этот кошелёк уже отслеживается!');
+    return;
+  }
+  trackedWallets.push({ address: addr, addedAt: Date.now() });
+  localStorage.setItem('wallets', JSON.stringify(trackedWallets));
+  input.value = '';
+  renderWallets();
+}
+
+function removeWallet(i) {
+  trackedWallets.splice(i, 1);
+  localStorage.setItem('wallets', JSON.stringify(trackedWallets));
+  renderWallets();
+}
+
+// ── INIT ──
+renderWallets();
+</script>
+</body>
+</html>
