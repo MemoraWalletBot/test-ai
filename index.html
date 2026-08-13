@@ -575,9 +575,11 @@ function switchTab(tab) {
   if (tab === 'market' && !marketLoaded) loadMarket();
 }
 
-// ── CHAT ──
-let chatHistory = [];
-const systemPrompt = `You are Crypto Guardian AI — an expert crypto and meme-coin intelligence assistant integrated into a Telegram Mini App. 
+// ── GEMINI API KEY — ВСТАВЬ СВОЙ КЛЮЧ СЮДА ──
+const GEMINI_KEY = 'ВСТАВЬ_КЛЮЧ_СЮДА';
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`;
+
+const systemPrompt = `You are Crypto Guardian AI — an expert crypto and meme-coin intelligence assistant integrated into a Telegram Mini App.
 
 Your capabilities:
 - Answer ANY question about cryptocurrencies, meme coins, DeFi, NFTs, wallets
@@ -595,10 +597,40 @@ Response rules:
 - Never give financial advice — provide analysis and education only
 - When discussing meme coins, always mention risks clearly`;
 
+// ── CHAT ──
+let chatHistory = [];
+
+async function callGemini(userText, historyMessages) {
+  const contents = [];
+  if (historyMessages && historyMessages.length > 0) {
+    for (const m of historyMessages) {
+      contents.push({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] });
+    }
+  } else {
+    contents.push({ role: 'user', parts: [{ text: userText }] });
+  }
+  const res = await fetch(GEMINI_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents,
+      generationConfig: { maxOutputTokens: 1000, temperature: 0.7 }
+    })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Нет ответа.';
+}
+
 async function sendMessage() {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
   if (!text) return;
+  if (GEMINI_KEY === 'ВСТАВЬ_КЛЮЧ_СЮДА') {
+    appendMsg('⚠️ Сначала вставь Gemini API ключ в файл! Найди строку GEMINI_KEY и замени текст внутри кавычек на свой ключ AIza...', 'ai');
+    return;
+  }
 
   input.value = '';
   input.style.height = 'auto';
@@ -608,24 +640,13 @@ async function sendMessage() {
   const typingId = appendTyping();
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        system: systemPrompt,
-        messages: chatHistory.slice(-10)
-      })
-    });
-    const data = await res.json();
-    const reply = data.content?.[0]?.text || 'Ошибка получения ответа.';
+    const reply = await callGemini(text, chatHistory.slice(-10));
     removeTyping(typingId);
     appendMsg(reply, 'ai');
     chatHistory.push({ role: 'assistant', content: reply });
   } catch(e) {
     removeTyping(typingId);
-    appendMsg('Ошибка соединения. Проверьте интернет и попробуйте снова.', 'ai');
+    appendMsg('Ошибка: ' + (e.message || 'Проверьте API ключ и интернет.'), 'ai');
   }
 }
 
@@ -715,22 +736,12 @@ Respond ONLY in valid JSON format (no markdown, no extra text):
 }`;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: scanPrompt }]
-      })
-    });
-    const data = await res.json();
-    let raw = data.content?.[0]?.text || '{}';
-    raw = raw.replace(/```json|```/g,'').trim();
+    const raw_text = await callGemini(scanPrompt, null);
+    let raw = raw_text.replace(/```json|```/g,'').trim();
     const analysis = JSON.parse(raw);
     renderScanResult(analysis);
   } catch(e) {
-    resultDiv.innerHTML = `<div style="padding:16px;color:var(--danger);font-size:13px;">⚠️ Ошибка анализа. Попробуйте ещё раз.</div>`;
+    resultDiv.innerHTML = `<div style="padding:16px;color:var(--danger);font-size:13px;">⚠️ Ошибка анализа: ${e.message||'попробуйте ещё раз'}</div>`;
   }
 }
 
